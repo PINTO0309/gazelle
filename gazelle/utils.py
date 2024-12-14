@@ -8,7 +8,9 @@ def repeat_tensors(tensor, repeat_counts):
     return torch.cat(repeated_tensors, dim=0)
 
 def split_tensors(tensor, split_counts):
-    indices = torch.cumsum(torch.tensor([0] + split_counts), dim=0)
+    # indices = torch.cumsum(torch.tensor([0] + split_counts), dim=0)
+    split_counts = torch.tensor([split_counts])
+    indices = torch.cumsum(torch.cat([torch.tensor([0]), split_counts]), dim=0)
     return [tensor[indices[i]:indices[i+1]] for i in range(len(split_counts))]
 
 def visualize_heatmap(pil_image, heatmap, bbox=None):

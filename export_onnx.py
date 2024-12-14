@@ -22,9 +22,9 @@ from onnxsim import simplify
 """
 
 models = {
-    "gazelle_dinov2_vitb14": ["gazelle_dinov2_vitb14.pt", False],
+    # "gazelle_dinov2_vitb14": ["gazelle_dinov2_vitb14.pt", False],
     # "gazelle_dinov2_vitl14": ["gazelle_dinov2_vitl14.pt", False],
-    # "gazelle_dinov2_vitb14_inout": ["gazelle_dinov2_vitb14_inout.pt", True],
+    "gazelle_dinov2_vitb14_inout": ["gazelle_dinov2_vitb14_inout.pt", True],
     # "gazelle_dinov2_vitl14_inout": ["gazelle_dinov2_vitl14_inout.pt", True],
 }
 
@@ -51,18 +51,28 @@ for m, params in models.items():
     # predicted_inout = output["inout"][0][0]
 
 
-    onnx_file = f"{params[0]}_1x3x448x448.onnx"
+    num_heads = 1
+    onnx_file = f"{params[0]}_1x3x448x448_1x{num_heads}x4.onnx"
     images = torch.randn(1, 3, 448, 448).cpu()
-    bboxes = torch.randn(1, 1, 4).cpu()
+    bboxes = torch.randn(1, num_heads, 4).cpu()
     if not params[1]:
         outputs = [
             'heatmap',
         ]
+        dynamic_axes = {
+            'bboxes_x1y1x2y2' : {1: 'heads'},
+            'heatmap': {0: 'heads'}
+        }
     else:
         outputs = [
             'heatmap',
             'inout',
         ]
+        dynamic_axes = {
+            'bboxes_x1y1x2y2' : {1: 'heads'},
+            'heatmap': {0: 'heads'},
+            'inout': {0: 'heads'},
+        }
 
     torch.onnx.export(
         model,
@@ -78,7 +88,35 @@ for m, params in models.items():
     model_onnx1 = onnx.load(onnx_file)
     model_onnx1 = onnx.shape_inference.infer_shapes(model_onnx1)
     onnx.save(model_onnx1, onnx_file)
+    model_onnx2 = onnx.load(onnx_file)
+    model_simp, check = simplify(model_onnx2)
+    onnx.save(model_simp, onnx_file)
+    model_onnx2 = onnx.load(onnx_file)
+    model_simp, check = simplify(model_onnx2)
+    onnx.save(model_simp, onnx_file)
+    model_onnx2 = onnx.load(onnx_file)
+    model_simp, check = simplify(model_onnx2)
+    onnx.save(model_simp, onnx_file)
 
+
+    onnx_file = f"{params[0]}_1x3x448x448_1xNx4.onnx"
+    images = torch.randn(1, 3, 448, 448).cpu()
+    bboxes = torch.randn(1, num_heads, 4).cpu()
+    torch.onnx.export(
+        model,
+        args=(images, bboxes),
+        f=onnx_file,
+        opset_version=14,
+        input_names=[
+            'images',
+            'bboxes_x1y1x2y2',
+        ],
+        output_names=outputs,
+        dynamic_axes=dynamic_axes,
+    )
+    model_onnx1 = onnx.load(onnx_file)
+    model_onnx1 = onnx.shape_inference.infer_shapes(model_onnx1)
+    onnx.save(model_onnx1, onnx_file)
     model_onnx2 = onnx.load(onnx_file)
     model_simp, check = simplify(model_onnx2)
     onnx.save(model_simp, onnx_file)

@@ -168,13 +168,15 @@ class GazeLLE_ONNX(nn.Module):
         # input["images"]: [B, 3, H, W] tensor of images
         # input["bboxes"]: list of lists of bbox tuples [[(xmin, ymin, xmax, ymax)]] per image in normalized image coords
 
-        num_ppl_per_img = [len(bbox_list) for bbox_list in bboxes]
+        num_ppl_per_img = bboxes.shape[1]
+
         x = self.backbone.forward(images)
         x = self.linear(x)
         x = x + self.pos_embed
-        x = utils.repeat_tensors(x, num_ppl_per_img) # repeat image features along people dimension per image
-        head_maps = torch.cat(self.get_input_head_maps(bboxes), dim=0).to(x.device) # [sum(N_p), 32, 32]
-        head_map_embeddings = head_maps.unsqueeze(dim=1) * self.head_token.weight.unsqueeze(-1).unsqueeze(-1)
+        x = x * torch.ones([num_ppl_per_img,1,1,1], dtype=torch.float32)
+
+        head_maps = self.get_input_head_maps(bboxes).to(x.device).permute(1,0,2,3) # [sum(N_p), 1, 32, 32]
+        head_map_embeddings = head_maps * self.head_token.weight.unsqueeze(-1).unsqueeze(-1)
         x = x + head_map_embeddings
         x = x.flatten(start_dim=2).permute(0, 2, 1) # "b c h w -> b (h w) c"
 
@@ -186,35 +188,44 @@ class GazeLLE_ONNX(nn.Module):
         if self.inout:
             inout_tokens = x[:, 0, :]
             inout_preds = self.inout_head(inout_tokens).squeeze(dim=-1)
-            inout_preds = utils.split_tensors(inout_preds, num_ppl_per_img)
             x = x[:, 1:, :] # slice off inout tokens from scene tokens
 
         x = x.reshape(x.shape[0], self.featmap_h, self.featmap_w, x.shape[2]).permute(0, 3, 1, 2) # b (h w) c -> b c h w
         x = self.heatmap_head(x).squeeze(dim=1)
         x = torchvision.transforms.functional.resize(x, self.out_size)
-        heatmap_preds = utils.split_tensors(x, num_ppl_per_img) # resplit per image
+        heatmap_preds = x
 
         return {"heatmap": heatmap_preds, "inout": inout_preds if self.inout else None}
 
-    def get_input_head_maps(self, bboxes):
+    def get_input_head_maps(self, bboxes: torch.Tensor):
         # bboxes: [[(xmin, ymin, xmax, ymax)]] - list of list of head bboxes per image
-        head_maps = []
-        for bbox_list in bboxes:
-            img_head_maps = []
-            for bbox in bbox_list:
-                if bbox is None: # no bbox provided, use empty head map
-                    img_head_maps.append(torch.zeros(self.featmap_h, self.featmap_w))
-                else:
-                    xmin, ymin, xmax, ymax = bbox
-                    width, height = self.featmap_w, self.featmap_h
-                    xmin = torch.round(xmin * width).to(torch.int32)
-                    ymin = torch.round(ymin * height).to(torch.int32)
-                    xmax = torch.round(xmax * width).to(torch.int32)
-                    ymax = torch.round(ymax * height).to(torch.int32)
-                    head_map = torch.zeros((height, width))
-                    head_map[ymin:ymax, xmin:xmax] = 1
-                    img_head_maps.append(head_map)
-            head_maps.append(torch.stack(img_head_maps))
+        N, M, _ = bboxes.shape
+
+        # 1. 画像サイズに基づいて bboxes のスケール変換
+        bboxes_scaled = bboxes
+        bboxes_scaled[..., 0:1] = bboxes_scaled[..., 0:1] * self.featmap_w  # xmin, xmax を featmap_w でスケール
+        bboxes_scaled[..., 2:3] = bboxes_scaled[..., 2:3] * self.featmap_w  # xmin, xmax を featmap_w でスケール
+        bboxes_scaled[..., 1:2] = bboxes_scaled[..., 1:2] * self.featmap_h  # ymin, ymax を featmap_h でスケール
+        bboxes_scaled[..., 3:4] = bboxes_scaled[..., 3:4] * self.featmap_h  # ymin, ymax を featmap_h でスケール
+
+        # 2. 整数に変換 (torch.round して int32 に変換)
+        bboxes_scaled = torch.round(bboxes_scaled).to(torch.int32)  # [N, M, 4]
+        xmin, ymin, xmax, ymax = bboxes_scaled.split(1, dim=2)  # [N, M] に分解
+
+        # 3. y, x のインデックスを作成
+        y_range = torch.arange(self.featmap_h, device=bboxes.device).view(1, 1, -1, 1)  # [1, 1, H, 1]
+        x_range = torch.arange(self.featmap_w, device=bboxes.device).view(1, 1, 1, -1)  # [1, 1, 1, W]
+
+        # 4. バイナリマスクの作成
+        ymin = ymin[..., None]  # [N, M, 1, 1]
+        ymax = ymax[..., None]  # [N, M, 1, 1]
+        xmin = xmin[..., None]  # [N, M, 1, 1]
+        xmax = xmax[..., None]  # [N, M, 1, 1]
+
+        y_mask = (y_range >= ymin) & (y_range < ymax)  # [N, M, H, 1]
+        x_mask = (x_range >= xmin) & (x_range < xmax)  # [N, M, 1, W]
+        head_maps = y_mask & x_mask  # [N, M, H, W]
+
         return head_maps
 
     def get_gazelle_state_dict(self, include_backbone=False):
