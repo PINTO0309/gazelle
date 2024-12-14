@@ -34,23 +34,6 @@ for m, params in models.items():
     model.eval()
     model.cpu()
 
-    # image = Image.open("path/to/image.png").convert("RGB")
-    # input = {
-    #     # tensor of shape [1, 3, 448, 448]
-    #     "images": transform(image).unsqueeze(dim=0).cpu(),
-    #     # list of lists of bbox tuples
-    #     # [(xmin, ymin, xmax, ymax)], 0.0-1.0 norm
-    #     "bboxes": [[(0.1, 0.2, 0.5, 0.7)]]
-    # }
-
-    # with torch.no_grad():
-    #     output = model(input)
-    # # access prediction for first person in first image. Tensor of size [64, 64]
-    # predicted_heatmap = output["heatmap"][0][0]
-    # # in/out of frame score (1 = in frame) (output["inout"] will be None  for non-inout models)
-    # predicted_inout = output["inout"][0][0]
-
-
     num_heads = 1
     onnx_file = f"{params[0]}_1x3x448x448_1x{num_heads}x4.onnx"
     images = torch.randn(1, 3, 448, 448).cpu()
@@ -80,7 +63,7 @@ for m, params in models.items():
         f=onnx_file,
         opset_version=14,
         input_names=[
-            'images',
+            'image_bgr',
             'bboxes_x1y1x2y2',
         ],
         output_names=outputs,
@@ -108,7 +91,7 @@ for m, params in models.items():
         f=onnx_file,
         opset_version=14,
         input_names=[
-            'images',
+            'image_bgr',
             'bboxes_x1y1x2y2',
         ],
         output_names=outputs,

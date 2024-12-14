@@ -6,7 +6,7 @@ import math
 
 import gazelle.utils as utils
 from gazelle.backbone import DinoV2Backbone
-
+import torchvision.transforms.functional as F
 
 class GazeLLE(nn.Module):
     def __init__(self, backbone, inout=False, dim=256, num_layers=3, in_size=(448, 448), out_size=(64, 64)):
@@ -164,13 +164,29 @@ class GazeLLE_ONNX(nn.Module):
             )
             self.inout_token = nn.Embedding(1, self.dim)
 
-    def forward(self, images, bboxes):
+    def forward(self, image_bgr, bboxes):
         # input["images"]: [B, 3, H, W] tensor of images
         # input["bboxes"]: list of lists of bbox tuples [[(xmin, ymin, xmax, ymax)]] per image in normalized image coords
 
+        # return transforms.Compose([
+        #     transforms.ToTensor(),
+        #     transforms.Normalize(
+        #         mean=[0.485,0.456,0.406],
+        #         std=[0.229,0.224,0.225]
+        #     ),
+        #     transforms.Resize(in_size),
+        # ])
+
+        mean = torch.tensor([0.485,0.456,0.406], dtype=torch.float32)
+        std = torch.tensor([0.229,0.224,0.225], dtype=torch.float32)
+
+        image_rgb = torch.cat([image_bgr[:, 2:3, ...], image_bgr[:, 1:2, ...], image_bgr[:, 0:1, ...]], dim=1)
+        image_rgb = F.resize(img=image_rgb, size=(448, 448))
+        image_rgb = image_rgb / 255.0
+
         num_ppl_per_img = bboxes.shape[1]
 
-        x = self.backbone.forward(images)
+        x = self.backbone.forward(image_rgb)
         x = self.linear(x)
         x = x + self.pos_embed
         x = x * torch.ones([num_ppl_per_img,1,1,1], dtype=torch.float32)
