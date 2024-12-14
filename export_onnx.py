@@ -1,4 +1,4 @@
-from PIL import Image
+import os
 import torch
 from gazelle.model import get_gazelle_model
 import onnx
@@ -35,7 +35,8 @@ for m, params in models.items():
     model.cpu()
 
     num_heads = 1
-    onnx_file = f"{params[0]}_1x3x448x448_1x{num_heads}x4.onnx"
+    filename_wo_ext = os.path.splitext(os.path.basename(params[0]))[0]
+    onnx_file = f"{filename_wo_ext}_1x3x448x448_1x{num_heads}x4.onnx"
     images = torch.randn(1, 3, 448, 448).cpu()
     bboxes = torch.randn(1, num_heads, 4).cpu()
     if not params[1]:
@@ -82,7 +83,7 @@ for m, params in models.items():
     onnx.save(model_simp, onnx_file)
 
 
-    onnx_file = f"{params[0]}_1x3x448x448_1xNx4.onnx"
+    onnx_file = f"{filename_wo_ext}_1x3x448x448_1xNx4.onnx"
     images = torch.randn(1, 3, 448, 448).cpu()
     bboxes = torch.randn(1, num_heads, 4).cpu()
     torch.onnx.export(
