@@ -2,11 +2,71 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python デバッガー: 現在のファイル",
+            "name": "onnx_export",
             "type": "debugpy",
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal"
+        },
+        {
+            "name": "demo",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args": [
+                "-om", "yolov9_e_wholebody25_post_0100_1x3x480x640.onnx",
+                "-gm", "gazelle_dinov2_vitb14_1x3x448x448_1xNx4.onnx",
+
+                "-v", "0",
+                // "-v", "mobilityaids_full_video.mp4",
+                // "-v", "people_walking3.mp4",
+                // "-v", "D0002011239_00000_V_000.mp4",
+                // "-v", "Kazam_screencast_00135.mp4",
+                // "-v", "test_3_1280x480.mp4",
+
+                "-ep", "cuda",
+                // "-it", "int8",
+                // "-dvw",
+                // "-dwk",
+
+                // "-ost", "0.35",
+                // "-ast", "0.70",
+
+                "-dnm",
+                "-dgm",
+                "-dlr",
+                "-dhm",
+                // "-drc", "17", "18", "19", "20", "21",
+                // "-oyt",
+            ]
+        },
+        {
+            "name": "demo_img",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": [
+                "-om", "yolov9_e_wholebody25_post_0100_1x3x480x640.onnx",
+
+                "-i", "../images_partial",
+                "-ep", "cuda",
+                // "-it", "int8",
+                "-dvw",
+                "-dwk",
+
+                // "-ost", "0.15",
+                // "-ast", "0.70",
+
+                "-dnm",
+                "-dgm",
+                "-dlr",
+                "-dhm",
+                // "-drc", "17", "18", "19", "20", "21",
+                // "-oyt",
+            ]
         }
     ]
 }

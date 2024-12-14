@@ -167,3 +167,7 @@ cython_debug/
 
 *.pt
 *.onnx
+*.engine
+*.profile
+*.png
+*.mp4

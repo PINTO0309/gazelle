@@ -177,12 +177,13 @@ class GazeLLE_ONNX(nn.Module):
         #     transforms.Resize(in_size),
         # ])
 
-        mean = torch.tensor([0.485,0.456,0.406], dtype=torch.float32)
-        std = torch.tensor([0.229,0.224,0.225], dtype=torch.float32)
+        mean = torch.tensor([0.485,0.456,0.406], dtype=torch.float32).reshape([1,3,1,1])
+        std = torch.tensor([0.229,0.224,0.225], dtype=torch.float32).reshape([1,3,1,1])
 
         image_rgb = torch.cat([image_bgr[:, 2:3, ...], image_bgr[:, 1:2, ...], image_bgr[:, 0:1, ...]], dim=1)
         image_rgb = F.resize(img=image_rgb, size=(448, 448))
-        image_rgb = image_rgb / 255.0
+        image_rgb = image_rgb * 0.003921569
+        image_rgb = (image_rgb - mean) / std
 
         num_ppl_per_img = bboxes.shape[1]
 
