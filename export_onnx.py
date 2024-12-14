@@ -22,10 +22,10 @@ from onnxsim import simplify
 """
 
 models = {
-    # "gazelle_dinov2_vitb14": ["gazelle_dinov2_vitb14.pt", False],
-    # "gazelle_dinov2_vitl14": ["gazelle_dinov2_vitl14.pt", False],
+    "gazelle_dinov2_vitb14": ["gazelle_dinov2_vitb14.pt", False],
+    "gazelle_dinov2_vitl14": ["gazelle_dinov2_vitl14.pt", False],
     "gazelle_dinov2_vitb14_inout": ["gazelle_dinov2_vitb14_inout.pt", True],
-    # "gazelle_dinov2_vitl14_inout": ["gazelle_dinov2_vitl14_inout.pt", True],
+    "gazelle_dinov2_vitl14_inout": ["gazelle_dinov2_vitl14_inout.pt", True],
 }
 
 for m, params in models.items():
