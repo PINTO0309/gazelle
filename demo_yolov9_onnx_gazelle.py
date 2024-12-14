@@ -76,8 +76,6 @@ class Box():
     y2_norm: float
     cx: int
     cy: int
-    cx_norm: float
-    cy_norm: float
     generation: int = -1 # -1: Unknown, 0: Adult, 1: Child
     gender: int = -1 # -1: Unknown, 0: Male, 1: Female
     handedness: int = -1 # -1: Unknown, 0: Left, 1: Right
@@ -433,8 +431,6 @@ class YOLOv9(AbstractModel):
                     y2_norm = min(box[6], self._input_shapes[0][self._h_index]) / self._input_shapes[0][self._h_index]
                     cx = (x_min + x_max) // 2
                     cy = (y_min + y_max) // 2
-                    cx_norm = (x1_norm + x2_norm) / 2
-                    cy_norm = (y1_norm + y2_norm) / 2
                     result_boxes.append(
                         Box(
                             classid=classid,
@@ -449,8 +445,6 @@ class YOLOv9(AbstractModel):
                             y2_norm=y2_norm,
                             cx=cx,
                             cy=cy,
-                            cx_norm=cx_norm,
-                            cy_norm=cy_norm,
                             generation=-1, # -1: Unknown, 0: Adult, 1: Child
                             gender=-1, # -1: Unknown, 0: Male, 1: Female
                             handedness=-1, # -1: Unknown, 0: Left, 1: Right
@@ -517,6 +511,16 @@ class YOLOv9(AbstractModel):
                     left_right_hand_boxes = [box for box in result_boxes if box.classid in [22, 23]]
                     self._find_most_relevant_obj(base_objs=hand_boxes, target_objs=left_right_hand_boxes)
                 result_boxes = [box for box in result_boxes if box.classid not in [22, 23]]
+
+                # Nose merge
+                # classid: 7 -> Head
+                #   classid: 18 -> Nose
+                # 1. Calculate Nose IoUs for Head detection results
+                # 2. Connect either the Nose with the highest score and the highest IoU with the Head.
+                head_boxes = [box for box in result_boxes if box.classid == 7]
+                nose_boxes = [box for box in result_boxes if box.classid in [18]]
+                self._find_most_relevant_obj(base_objs=head_boxes, target_objs=nose_boxes)
+                result_boxes = [box for box in result_boxes if box.classid not in [18]]
         return result_boxes
 
     def _find_most_relevant_obj(
@@ -659,7 +663,7 @@ class GazeLLE(AbstractModel):
         self,
         image: np.ndarray,
         head_boxes: List[Box],
-    ) -> np.ndarray:
+    ) -> Tuple[np.ndarray, np.ndarray]:
         """
 
         Parameters
@@ -672,8 +676,11 @@ class GazeLLE(AbstractModel):
 
         Returns
         -------
-        result_image: uint8[image_height, image_width, 3]
-            BGR
+        result_image: np.ndarray
+            BGR, uint8[image_height, image_width, 3]
+
+        heatmaps: np.ndarray
+            [1, 64, 64]
         """
         temp_image = copy.deepcopy(image)
         # PreProcess
@@ -697,7 +704,11 @@ class GazeLLE(AbstractModel):
                 image_bgr=temp_image,
                 heatmaps=heatmaps,
             )
-        return result_image
+        image_height = temp_image.shape[0]
+        image_width = temp_image.shape[1]
+        heatmap_list = [cv2.resize(heatmap[..., None], (image_width, image_height)) for heatmap in heatmaps]
+        resized_heatmatp = np.asarray(heatmap_list)
+        return result_image, resized_heatmatp
 
     def _preprocess(
         self,
@@ -1109,10 +1120,13 @@ def main():
             disable_left_and_right_hand_identification_mode=disable_left_and_right_hand_identification_mode,
             disable_headpose_identification_mode=disable_headpose_identification_mode,
         )
-        debug_image = gazelle_model(
-            image=debug_image,
-            head_boxes=[box for box in boxes if box.classid == 7]
-        )
+        head_boxes = [box for box in boxes if box.classid == 7]
+        heatmaps = []
+        if len(head_boxes) > 0:
+            debug_image, heatmaps = gazelle_model(
+                image=debug_image,
+                head_boxes=head_boxes,
+            )
         elapsed_time = time.perf_counter() - start_time
 
         if file_paths is None:
@@ -1348,6 +1362,26 @@ def main():
             #     1,
             #     cv2.LINE_AA,
             # )
+
+        # 重心 (centroid) を計算する関数
+        def calculate_centroid(heatmap: np.ndarray) -> Tuple[int, int, float]:
+            # 1. ピーク値を求める
+            peak_value = np.max(heatmap)
+            # 2. ピーク値との差の絶対値を計算
+            diff = np.abs(heatmap - peak_value)
+            # 3. 差が最小の要素のインデックスを取得（1Dインデックス）
+            min_index = np.argmin(diff)
+            # 4. 1Dインデックスを2Dインデックス (y, x) に変換
+            y, x = np.unravel_index(min_index, heatmap.shape)
+            return int(x), int(y), heatmap[y, x]
+
+        for head_box, heatmap in zip(head_boxes, heatmaps):
+            cx, cy, score = calculate_centroid(heatmap)
+            if score >= 0.50:
+                cv2.line(debug_image, (head_box.cx, head_box.cy), (cx, cy), (255, 255, 255), thickness=2, lineType=cv2.LINE_AA)
+                cv2.line(debug_image, (head_box.cx, head_box.cy), (cx, cy), (0, 255, 0), thickness=2, lineType=cv2.LINE_AA)
+                cv2.circle(debug_image, (cx, cy), 4, (255,255,255), thickness=-1, lineType=cv2.LINE_AA)
+                cv2.circle(debug_image, (cx, cy), 3, (0,0,255), thickness=-1, lineType=cv2.LINE_AA)
 
         if file_paths is not None:
             basename = os.path.basename(file_paths[file_paths_count])
