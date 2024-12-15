@@ -1,6 +1,6 @@
 # Test
 
-- YOLOv9 + Gaze-LLE ONNX-TensorRT + backword attention
+- Webcam realtime + YOLOv9 + Gaze-LLE ONNX-TensorRT + backword attention
 
   https://github.com/PINTO0309/PINTO_model_zoo/tree/main/462_Gaze-LLE
 
