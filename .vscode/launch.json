@@ -16,7 +16,7 @@
             "console": "integratedTerminal",
             "args": [
                 "-om", "yolov9_e_wholebody25_post_0100_1x3x480x640.onnx",
-                "-gm", "gazelle_dinov2_vitb14_inout_1x3x448x448_1xNx4.onnx",
+                "-gm", "gazelle_dinov2_vitl14_inout_1x3x448x448_1xNx4.onnx",
 
                 "-v", "0",
                 // "-v", "mobilityaids_full_video.mp4",
