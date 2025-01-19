@@ -1,6 +1,8 @@
 # ⚠️ This fork is just a customized and optimized version of the official implementation. ⚠️ 
 # Test
 
+The reason the processing speed of the demo video appears to be around 30ms is because the heatmap rendering process using Pillow is slow. If you stop the heatmap rendering process by pressing the `A` key on the keyboard, the processing speed will increase to around 17ms.
+
 - Webcam realtime + YOLOv9 + Gaze-LLE ONNX-TensorRT + backword attention
 
   https://github.com/PINTO0309/PINTO_model_zoo/tree/main/462_Gaze-LLE
