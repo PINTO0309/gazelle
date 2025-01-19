@@ -1,7 +1,7 @@
 # ⚠️ This fork is just a customized and optimized version of the official implementation. ⚠️ 
 # Test
 
-The reason the processing speed of the demo video appears to be around 30ms is because the heatmap rendering process using Pillow is slow. If you stop the heatmap rendering process by pressing the `A` key on the keyboard, the processing speed will increase to around 17ms.
+The reason the processing speed of the demo video appears to be around 30ms is because the heatmap rendering process using Pillow is slow. If you stop the heatmap rendering process by pressing the `A` key on the keyboard, the processing speed will increase to around 17ms. Of the 17ms, 10ms is the inference time for YOLOv9-E.
 
 - Webcam realtime + YOLOv9 + Gaze-LLE ONNX-TensorRT + backword attention
 
